@@ -27,8 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--file", dest="inputfile",   type=str, nargs="+", help="Input files")
     parser.add_argument("--hname",       type=str, nargs="+", help="Histogram name to pick from each file")
     parser.add_argument("--legendEntry", type=str, nargs="+", help="Legend entry")
-    #parser.add_argument("--hname", default=None, required=True, type=str, nargs=2, help="Name of histograms to get from the input files")
-    parser.add_argument("-x", "--x-axis-name", dest="xAxisName", default="Invariant mass (GeV) ", help="x axis name")
+    parser.add_argument("-x", "--x-axis-name", dest="xAxisName", default="Invariant mass (GeV)", help="x axis name")
     parser.add_argument(     "--rebin-x", dest="rebinX", default=1, type=int, help="To rebin x axis (mass)")
     parser.add_argument(     "--rebin-y", dest="rebinY", default=1, type=int, help="To rebin y axis (pt)")
     parser.add_argument(     "--rebin-z", dest="rebinZ", default=1, type=int, help="To rebin z axis (eta)")
@@ -81,7 +80,7 @@ if __name__ == "__main__":
     if args.zbin[0] > 0 and args.zbin[1] > 0:
         izmin,izmax = args.zbin
 
-    colors = [ROOT.kBlack, ROOT.kBlue, ROOT.kRed+2, ROOT.kGreen+2, ROOT.kOrange+2]
+    colors = [ROOT.kBlack, ROOT.kRed+2, ROOT.kBlue, ROOT.kGreen+2, ROOT.kOrange+2]
         
     for ieta in range(1, 1 + hists3D[0].GetNbinsZ()):
         if not (izmin <= ieta <= izmax):

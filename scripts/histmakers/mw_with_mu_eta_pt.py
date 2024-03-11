@@ -373,7 +373,11 @@ def build_graph(df, dataset):
 
     # Jet collection actually has a pt threshold of 15 GeV in MiniAOD 
     df = df.Define("goodCleanJetsNoPt", "Jet_jetId >= 6 && (Jet_pt > 50 || Jet_puId >= 4) && abs(Jet_eta) < 2.4 && wrem::cleanJetsFromLeptons(Jet_eta,Jet_phi,Muon_correctedEta[vetoMuons],Muon_correctedPhi[vetoMuons],Electron_eta[vetoElectrons],Electron_phi[vetoElectrons])")
-    df = df.Define("passIso", "goodMuons_pfRelIso04_all0 < 0.15")
+
+    #df = df.Define("passIso", "goodMuons_pfRelIso04_all0 < 0.15")
+    #### TEST to use dxy instead of iso
+    df = df.Define("passIso", "abs(Muon_dxybs[goodMuons][0]) < 0.01")
+    ####
     
     # testing alternate definition of the muon pt for fakes:
     # if passIso:
@@ -486,12 +490,13 @@ def build_graph(df, dataset):
             results.append(muonHasJet)
             # add a cut to a new branch of the dataframe
             dfalt = df.Filter("goodMuons_hasJet0")
-            axis_jetpt = hist.axis.Regular(template_npt, template_minpt, template_maxpt, name = "jetpt", overflow=False, underflow=False)
-            muonPtVsJetPt = dfalt.HistoBoost("muonPtVsJetPt", [axis_pt, axis_jetpt, axis_passIso], ["goodMuons_pt0", "goodMuons_jetpt0", "passIso", "nominal_weight"])
+            axis_jetpt = hist.axis.Regular(40,20,60, name = "jetpt", overflow=False, underflow=False)
+            axis_muonpt = hist.axis.Regular(40,20,60, name = "pt", overflow=False, underflow=False)
+            muonPtVsJetPt = dfalt.HistoBoost("muonPtVsJetPt", [axis_muonpt, axis_jetpt, axis_passIso], ["goodMuons_pt0", "goodMuons_jetpt0", "passIso", "nominal_weight"])
             results.append(muonPtVsJetPt)
         ###
         #df = df.Filter("muonGenMatchStatus1prompt == 0")
-        mTStudyForFakes = df.HistoBoost("mTStudyForFakes", mTStudyForFakes_axes, ["goodMuons_eta0", "goodMuons_pt0", "goodMuons_charge0", "transverseMass", "passIso", "hasCleanJet", "deltaPhiMuonMet", "nominal_weight"])
+        mTStudyForFakes = df.HistoBoost("mTStudyForFakes", mTStudyForFakes_axes, ["goodMuons_eta0", "goodMuons_jetpt0", "goodMuons_charge0", "transverseMass", "passIso", "hasCleanJet", "deltaPhiMuonMet", "nominal_weight"])
         results.append(mTStudyForFakes)
 
     # add filter of deltaPhi(muon,met) before other histograms (but after histogram mTStudyForFakes)
