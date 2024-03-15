@@ -315,8 +315,8 @@ def build_graph(df, dataset):
 
     df = muon_calibration.define_corrected_muons(df, cvh_helper, jpsi_helper, args, dataset, smearing_helper, bias_helper)
 
-    df = muon_selections.select_veto_muons(df, nMuons=1, condition=">=")
-    df = muon_selections.select_good_muons(df, 0, 100, dataset.group, nMuons=1, use_trackerMuons=args.trackerMuons, use_isolation=False, condition=">=")
+    df = muon_selections.select_veto_muons(df, nMuons=1)
+    df = muon_selections.select_good_muons(df, 0, 100, dataset.group, nMuons=1, use_trackerMuons=args.trackerMuons, use_isolation=False)
 
     # the corrected RECO muon kinematics, which is intended to be used as the nominal
     df = muon_calibration.define_corrected_reco_muon_kinematics(df)
@@ -374,9 +374,9 @@ def build_graph(df, dataset):
     # Jet collection actually has a pt threshold of 15 GeV in MiniAOD 
     df = df.Define("goodCleanJetsNoPt", "Jet_jetId >= 6 && (Jet_pt > 50 || Jet_puId >= 4) && abs(Jet_eta) < 2.4 && wrem::cleanJetsFromLeptons(Jet_eta,Jet_phi,Muon_correctedEta[vetoMuons],Muon_correctedPhi[vetoMuons],Electron_eta[vetoElectrons],Electron_phi[vetoElectrons])")
 
-    #df = df.Define("passIso", "goodMuons_pfRelIso04_all0 < 0.15")
+    df = df.Define("passIso", "goodMuons_pfRelIso04_all0 < 0.15")
     #### TEST to use dxy instead of iso
-    df = df.Define("passIso", "abs(Muon_dxybs[goodMuons][0]) < 0.01")
+    #df = df.Define("passIso", "abs(Muon_dxybs[goodMuons][0]) < 0.01")
     ####
     
     # testing alternate definition of the muon pt for fakes:
@@ -496,7 +496,9 @@ def build_graph(df, dataset):
             results.append(muonPtVsJetPt)
         ###
         #df = df.Filter("muonGenMatchStatus1prompt == 0")
-        mTStudyForFakes = df.HistoBoost("mTStudyForFakes", mTStudyForFakes_axes, ["goodMuons_eta0", "goodMuons_jetpt0", "goodMuons_charge0", "transverseMass", "passIso", "hasCleanJet", "deltaPhiMuonMet", "nominal_weight"])
+        #df = df.Define("passIsoAlt", "(goodMuons_pfRelIso04_all0 * Muon_pt[goodMuons][0] / goodMuons_jetpt0) < 0.12")
+        df = df.Define("passIsoAlt", "(Muon_vtxAgnPfRelIso04_chg[goodMuons][0] * Muon_pt[goodMuons][0]) < 5.0")
+        mTStudyForFakes = df.HistoBoost("mTStudyForFakes", mTStudyForFakes_axes, ["goodMuons_eta0", "goodMuons_jetpt0", "goodMuons_charge0", "transverseMass", "passIsoAlt", "hasCleanJet", "deltaPhiMuonMet", "nominal_weight"])
         results.append(mTStudyForFakes)
 
     # add filter of deltaPhi(muon,met) before other histograms (but after histogram mTStudyForFakes)
