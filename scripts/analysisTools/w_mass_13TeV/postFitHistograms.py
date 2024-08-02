@@ -74,9 +74,12 @@ def dressed2DfromFit(h1d, binning, name, title='', shift=0,
 # if the flavour combinations was made, each charge sector is in turn divided in muons-electrons
 # at the end, there are N bins where N is the number of charges in the fit times number of masked channels for each charge
 
-def chargeUnrolledBinShifts(h1d, nCharges=2, nMaskedCha=2):
+def chargeUnrolledBinShifts(h1d, nCharges=2, nMaskedCha=2, chargeInclusive=False):
     nbins = int((h1d.GetNbinsX()-nCharges*nMaskedCha)/2)
     ret = {}
+    if chargeInclusive:
+        ret = {'inclusive': 0}
+        return ret
     if h1d.Integral(0,nbins)==0:
         ret = {'plus': nbins, 'minus': 0}
     else:
@@ -85,7 +88,7 @@ def chargeUnrolledBinShifts(h1d, nCharges=2, nMaskedCha=2):
 
 def singleChargeUnrolled(h1d, shift, nCharges=2, nMaskedCha=2, name="shift", nRecoBins=0):
     extrabins = 0 if 'obs' in h1d.GetName() else nCharges*nMaskedCha
-    nbins = int((h1d.GetNbinsX()-extrabins)/2)
+    nbins = int((h1d.GetNbinsX()-extrabins)/nCharges)
     h1d_shifted = ROOT.TH1D(name,'',nbins,0,nbins)
     #h1d_shifted.SetBins(nbins,0.5,float(nbins)+0.5)
     for b in range(1, nbins+1):
@@ -98,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument("rootfile", type=str, nargs=1, help="Input file with histograms")
     parser.add_argument('-o','--outdir', dest='outdir', default='.', type=str, help='output directory to save the plots')
     parser.add_argument('-m','--n-mask-chan', dest='nMaskedChannel', default=0, type=int, help='Number of masked channels in the fit for each charge (0 if not using masked channels because no signal POIs is used in the fit)')
-    parser.add_argument('-c','--charges', dest='charges', choices=['plus', 'minus', 'both'], default='both', type=str, help='Charges to process')
+    parser.add_argument('-c','--charges', dest='charges', choices=['plus', 'minus', 'both', 'inclusive'], default='both', type=str, help='Charges to process')
     parser.add_argument(     '--no2Dplot', dest="no2Dplot", action='store_true', help="Do not plot 2D templates")
     parser.add_argument(     '--comparePrefitPostfit', action='store_true', help="Plot comparisons of postfit/prefit yields and uncertainties ")
     parser.add_argument(     '--wlike', dest="isWlike", action='store_true', help="Analysis is wlike")
@@ -176,7 +179,7 @@ if __name__ == "__main__":
     #
     textForUnrolled = f"2 * (nllfull - nllsat) = {round(postfit_2deltaLL,1)}     ndof(+/-) = {ndof}     #chi^{{2}} prob = {round(100.0*postfit_chi2prob,1)}%::0.3,0.96,0.08,0.04"
 
-    shifts = chargeUnrolledBinShifts(h1d, nCharges, nMaskedChanPerCharge)
+    shifts = chargeUnrolledBinShifts(h1d, nCharges, nMaskedChanPerCharge, chargeInclusive=args.charges=="inclusive")
     # get process names:
     predictedProcessNames = []
     for k in infile.GetListOfKeys():
@@ -298,7 +301,7 @@ if __name__ == "__main__":
                 keyplot = f"{chfl}_{pname}"
                 logger.debug(f"Hist {hname}")
                 h1_1 = inputHists[p]
-                h2_backrolled = dressed2DfromFit(h1_1, binning, pname, titles[i], binshift, nMaskedCha=nMaskedChanPerCharge,
+                h2_backrolled = dressed2DfromFit(h1_1, binning, pname, titles[i], binshift, nCharges=nCharges, nMaskedCha=nMaskedChanPerCharge,
                                                  nRecoBins=nRecoBins)
                 h1_unrolled = unroll2Dto1D(h2_backrolled, newname=f"unroll_{pname}", cropNegativeBins=False)
                 h1_unrolled_y = unroll2Dto1D(h2_backrolled, newname=f"unroll_y_{pname}", cropNegativeBins=False, invertUnroll=True)
@@ -405,7 +408,7 @@ if __name__ == "__main__":
             expfullName2D = f"expfull_{charge}_{prepost}"
             h2_expfull_backrolled = dressed2DfromFit(h1_expfull, binning, expfullName2D, expfullName2D,
                                                      binshift,
-                                                     nMaskedCha=nMaskedChanPerCharge,
+                                                     nCharges=nCharges, nMaskedCha=nMaskedChanPerCharge,
                                                      nRecoBins=nRecoBins)
             h1_expfull_unrolled = unroll2Dto1D(h2_expfull_backrolled, newname=f"unroll_{expfullName2D}", cropNegativeBins=False)
             h1_expfull_unrolled_y = unroll2Dto1D(h2_expfull_backrolled, newname=f"unroll_y_{expfullName2D}", cropNegativeBins=False, invertUnroll=True)
@@ -480,7 +483,7 @@ if __name__ == "__main__":
             dataName2D = f"data_{charge}"
             h2_data_backrolled = dressed2DfromFit(safeGetObject(infile, "obs"), binning, dataName2D, dataName2D,
                                                   binshift,
-                                                  nMaskedCha=nMaskedChanPerCharge,
+                                                  nCharges=nCharges, nMaskedCha=nMaskedChanPerCharge,
                                                   nRecoBins=nRecoBins)
             hdata_unrolled = unroll2Dto1D(h2_data_backrolled, newname=f"unrolled_{charge}_data", cropNegativeBins=False)
             hdata_unrolled_y = unroll2Dto1D(h2_data_backrolled, newname=f"unrolled_{charge}_data", cropNegativeBins=False, invertUnroll=True)

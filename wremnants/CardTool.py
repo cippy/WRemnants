@@ -1187,6 +1187,13 @@ class CardTool(object):
                 logger.debug(f"Projecting {h.axes.name} into {axes}")
                 h = h.project(*axes)
 
+        axesToRemove = []
+        for ax in h.axes:
+            if ax.size == 1:
+                axesToRemove.append(ax.name)
+        logger.debug(f"Removing these axes with 1 bin: {axesToRemove}")
+        h = h[{ax: hist.tag.Slicer()[::hist.sum] for ax in axesToRemove}]
+
         if self.unroll:
             logger.debug(f"Unrolling histogram")
             h = hh.unrolledHist(h, axes)

@@ -2655,7 +2655,7 @@ def drawTH1dataMCstack(h1, thestack,
         ratio.SetMarkerSize(0.6 if (wideCanvas or leftMargin < 0.1) else 0.85)
         ratio.SetMarkerStyle(20) 
         den.Draw("E2same")
-        ratio.Draw("EPsame")
+        ratio.Draw("EP0same")
 
         # if not "unrolled_" in canvasName:
         #     for i in range(1,1+ratio.GetNbinsX()):

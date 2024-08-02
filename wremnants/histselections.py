@@ -201,7 +201,6 @@ def compute_chi2(y, y_pred, w=None, nparams=1):
 
     logger.info(f"Total chi2/ndf = {chi2_total}/{ndf_total} = {chi2_total/ndf_total} (p = {stats.chi2.sf(chi2_total, ndf_total)})")
     return chi2, ndf    
->>>>>>> 3c2be18852304daf4168a6dd2fa10b30b495744a
 
 def extend_edges(traits, x):
     # extend array for underflow/overflow with distance from difference of two closest values 
