@@ -308,6 +308,7 @@ def make_parser(parser=None):
         default=None,
         choices=[
             "charge",
+            "utAngleSign",
             "cosThetaStarll",
             "eta-sign",
             "eta-range",
@@ -323,6 +324,9 @@ def make_parser(parser=None):
         default=None,
         choices=[
             "charge",
+            "utAngleSign",
+            "eta-sign",
+            "eta-range",
         ],
         help="For use with --noi widthDiffW, select the variable to define the different mass differences",
     )
@@ -1760,12 +1764,12 @@ def setup(
                 suffix = "".join(
                     [a.capitalize() for a in args.widthDiffWVar.split("-")]
                 )
-                combine_helpers.add_mass_diff_variations(
+                combine_helpers.add_width_diff_variations(
                     datagroups,
                     args.widthDiffWVar,
                     name=widthWeightName,
                     processes=signal_samples_forMass,
-                    constrain=constrainMass,
+                    constrain="wwidth" not in args.noi,
                     suffix=suffix,
                     label=label,
                     passSystToFakes=passSystToFakes,

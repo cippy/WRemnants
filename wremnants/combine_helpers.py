@@ -33,14 +33,14 @@ def add_mass_diff_variations(
     )
     # mass difference by swapping the +50MeV with the -50MeV variations for half of the bins
     args = ["massShift", f"massShift{label}50MeVUp", f"massShift{label}50MeVDown"]
-    if mass_diff_var == "charge":
+    if any(mass_diff_var == var for var in ["charge", "utAngleSign"]):
         datagroups.addSystematic(
             **mass_diff_args,
             # # on gen level based on the sample, only possible for mW
             # preOpMap={m.name: (lambda h, swap=swap_bins: swap(h, "massShift", f"massShift{label}50MeVUp", f"massShift{label}50MeVDown"))
             #     for p in processes for g in datagroups.procGroups[p] for m in datagroups.groups[g].members if "minus" in m.name},
             # on reco level based on reco charge
-            preOp=lambda h: hh.swap_histogram_bins(h, *args, "charge", 0),
+            preOp=lambda h: hh.swap_histogram_bins(h, *args, mass_diff_var, 0),
         )
 
     elif mass_diff_var == "cosThetaStarll":
@@ -83,6 +83,56 @@ def add_mass_diff_variations(
         datagroups.addSystematic(
             **mass_diff_args,
             preOp=lambda h: hh.swap_histogram_bins(h, *args, mass_diff_var, 1),
+        )
+
+
+## TODO: currently largely copied from previous function
+def add_width_diff_variations(
+    datagroups,
+    width_diff_var,
+    name,
+    processes,
+    constrain=False,
+    suffix="",
+    label="W",
+    passSystToFakes=True,
+):
+    width_diff_args = dict(
+        histname=name,
+        name=f"widthDiff{suffix}{label}",
+        processes=processes,
+        group=f"widthDiff{label}",
+        systNameReplace=[(f"width{label}", f"width{label}Diff{suffix}")],
+        skipEntries=syst_tools.massWeightNames(
+            proc=label, exclude=(2.09053, 2.09173)
+        ),  # use 0.6 MeV variation, it is the only symmetric one we have
+        noi=not constrain,
+        noConstraint=not constrain,
+        mirror=False,
+        systAxes=["width"],
+        passToFakes=passSystToFakes,
+    )
+    # width difference by swapping the +0.6 MeV with the -0.6 MeV variations for half of the bins
+    args = ["width", f"width{label}0p6MeVUp", f"width{label}0p6MeVDown"]
+    if any(width_diff_var == var for var in ["charge", "utAngleSign"]):
+        datagroups.addSystematic(
+            **width_diff_args,
+            preOp=lambda h: hh.swap_histogram_bins(h, *args, width_diff_var, 0),
+        )
+
+    elif width_diff_var == "eta-sign":
+        datagroups.addSystematic(
+            **width_diff_args,
+            preOp=lambda h: hh.swap_histogram_bins(
+                h, *args, "eta", hist.tag.Slicer()[0 : complex(0, 0) :]
+            ),
+        )
+    elif width_diff_var == "eta-range":
+        datagroups.addSystematic(
+            **width_diff_args,
+            preOp=lambda h: hh.swap_histogram_bins(
+                h, *args, "eta", hist.tag.Slicer()[complex(0, -0.9) : complex(0, 0.9) :]
+            ),
         )
 
 

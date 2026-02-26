@@ -341,13 +341,16 @@ if args.plotdir is not None:
     if miny < 0:
         miny = 0
     maxy = 1.4 * (maxy - miny)
+    plotfilename = "correction_uT_vs_pT_eta_charge"
+    if args.postfix:
+        plotfilename += f"_{args.postfix}"
     drawNTH1(
         hists_corr,
         legEntries,
         "#it{p}_{T}^{#mu}",
         "Correction: #it{u}_{T}^{#mu} > 0 #rightarrow #it{u}_{T}^{#mu} < 0"
         + f"::{miny},{maxy}",
-        "correction_uT_vs_pT_eta_charge",
+        plotfilename,
         plotdir,
         lowerPanelHeight=0.4,
         legendCoords=(

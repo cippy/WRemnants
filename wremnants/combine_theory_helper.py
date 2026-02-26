@@ -998,7 +998,7 @@ class TheoryHelper(object):
             asname = pdf_corr_hist.replace("Vars", "_pdfas")
             # alphaS from correction histograms only available for these sets,
             # so fall back to CT18Z for other sets
-            if not ("MSHT20" in asname or "CT18Z" in asname or "MSHT20an3lo" in asname):
+            if not ("CT18Z" in asname or "MSHT20an3lo" in asname):
                 asname = "scetlib_dyturboCT18Z_pdfasCorr"
                 as_range = theory_tools.pdfMap["ct18z"]["alphasRange"]
             if asname.replace("Corr", "") not in self.datagroups.args_from_metadata(
