@@ -1102,6 +1102,25 @@ double get_differential_norm_weight(const double var_value,
   return weight_list[idx];
 }
 
+// apply transformation x -> smear * (x + scale)
+double get_scaled_smeared_variable(const unsigned int run,
+                                   const unsigned int lumi,
+                                   const unsigned long long event,
+                                   const double var, const double scale = 1.0,
+                                   const double smear = 0.1) {
+
+  // use scale=1.1 and smear=0.2 for 10% larger mean value and 20% resolution
+  // smearing
+  std::seed_seq seq{std::size_t(run), std::size_t(lumi), std::size_t(event)};
+  std::mt19937 rng(seq);
+
+  double scaled_var = var * scale;
+  if (smear <= 0)
+    return scaled_var;
+  std::normal_distribution<double> dis(scaled_var, scaled_var * smear);
+  return dis(rng);
+}
+
 } // namespace wrem
 
 #endif

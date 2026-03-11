@@ -369,6 +369,19 @@ nuisance_grouping = {
         "normZ_Helicity3",
         "normZ_Helicity4",
     ],
+    "max_recoil": common_groups
+    + [
+        "angularCoeffs",
+        "pdfCT18Z",
+        "pTModeling",
+        "muon_eff_syst",
+        "muon_eff_stat",
+        "prefire",
+        "muonCalibration",
+        "Fake",
+        "recoil_stat",
+        "recoil_syst_tmp",
+    ],
     "width": common_groups
     + [
         "angularCoeffs",
@@ -380,6 +393,8 @@ nuisance_grouping = {
         "muonCalibration",
         "Fake",
         "massShift",
+        "recoil_stat",
+        "recoil_syst_tmp",
     ],
     "min": common_groups
     + [
@@ -551,6 +566,8 @@ impact_labels = {
     "binByBinStatWtoNMu_10": "Bin-by-bin stat. (BSM)",
     "binByBinStatWtoNMu_50": "Bin-by-bin stat. (BSM)",
     "recoil": "recoil",
+    "recoil_stat": "recoil stat.",
+    "recoil_syst_tmp": "recoil syst.",
     "CMS_background": "Bkg.",
     "FakeHighMT": "FakeHighMT",
     "FakeLowMT": "FakeLowMT",

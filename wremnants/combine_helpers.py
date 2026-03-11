@@ -142,7 +142,6 @@ def add_recoil_uncertainty(
     passSystToFakes=False,
     pu_type="highPU",
     flavor="",
-    group_compact=True,
 ):
     met = datagroups.args_from_metadata("met")
     if flavor == "":
@@ -155,22 +154,24 @@ def add_recoil_uncertainty(
             processes=samples,
             mirror=True,
             groups=[
-                "recoil" if group_compact else "recoil_stat",
+                "recoil",
+                "recoil_stat",
                 "experiment",
                 "expNoCalib",
+                "expNoLumi",
             ],
             systAxes=["recoil_unc"],
             passToFakes=passSystToFakes,
         )
 
     if pu_type == "lowPU":
-        group_compact = False
         datagroups.addSystematic(
             "recoil_syst",
             processes=samples,
             mirror=True,
             groups=[
-                "recoil" if group_compact else "recoil_syst",
+                "recoil",
+                "recoil_syst",
                 "experiment",
                 "expNoCalib",
             ],
@@ -183,7 +184,8 @@ def add_recoil_uncertainty(
             processes=samples,
             mirror=True,
             groups=[
-                "recoil" if group_compact else "recoil_stat",
+                "recoil",
+                "recoil_stat",
                 "experiment",
                 "expNoCalib",
             ],

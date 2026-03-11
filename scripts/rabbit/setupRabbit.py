@@ -300,7 +300,7 @@ def make_parser(parser=None):
             "massdiffZ",
         ],
         default=["wmass"],
-        help="Select which nuisance(s) of interest to fit. Default: (%default)s",
+        help="Select which nuisance(s) of interest to fit. Default: (%%default)s",
     )
     parser.add_argument(
         "--massDiffWVar",
@@ -1880,7 +1880,7 @@ def setup(
                 )
 
         if inputBaseName != "prefsr":
-            # make prefsr ane EW free definition
+            # make prefsr and EW free definition
             combine_helpers.add_electroweak_uncertainty(
                 datagroups,
                 [*args.ewUnc, *args.fsrUnc, *args.isrUnc],
@@ -2234,9 +2234,17 @@ def setup(
                         ),
                     )
 
-            # must skip this part when fitting only utPlus with --select 'utAngleSign 1 2'
-            if "utAngleSign" in fitvar:
+            # must skip this part when fitting only utPlus with --select 'utAngleSign 1 2' or --select 'utAngleSign 0 1'
+            # is there a better way to check whether the negative uT bin is present?
+            if "utAngleSign" in fitvar and (
+                args.selection is None
+                or not any(
+                    sel in args.selection
+                    for sel in ["utAngleSign 1 2", "utAngleSign 0 1"]
+                )
+            ):
                 # TODO: extend and use previous function fake_nonclosure(...)
+                # TODO: move function elsewhere
                 def fake_nonclosure_byAxis(
                     h,
                     axesToDecorrNames=["eta"],
@@ -2256,13 +2264,13 @@ def setup(
                     hvar = (1 + variation_size) * hnom
                     if keepConstantAxisBin:
                         ax_names = [n for n in hvar.axes.name]
+                        idxs = [slice(None)] * hvar.ndim
                         for name in keepConstantAxisBin.keys():
                             if name not in ax_names:
                                 raise ValueError(
                                     f"In fake_nonclosure_byAxis(): axis '{name}' not found in hvar, valid names are {ax_names}"
                                 )
                             ax_index = ax_names.index(name)
-                            idxs = [slice(None)] * hvar.ndim
                             idxs[ax_index] = keepConstantAxisBin[name]
                         hvar.values()[tuple(idxs)] = hnom.values()[tuple(idxs)]
 
@@ -2272,7 +2280,7 @@ def setup(
 
                 datagroups.addSystematic(
                     inputBaseName,
-                    groups=[subgroup, "Fake", "experiment", "expNoCalib"],
+                    groups=[subgroup, "Fake", "experiment", "expNoCalib", "expNoLumi"],
                     name=f"{datagroups.fakeName}EtaClos_eta",
                     baseName=f"{datagroups.fakeName}EtaClos",
                     processes=datagroups.fakeName,
@@ -2287,6 +2295,116 @@ def setup(
                         keepConstantAxisBin={"utAngleSign": 1},
                     ),
                     systAxes=["eta_decorr"],
+                )
+
+                # TODO: move function elsewhere
+                def fake_transferFactor_ptSyst(
+                    h,
+                    axesToDecorrNames=[],
+                    altHistName="fakeCorr_altStat",
+                    varIdxs=[0],
+                    correctionFile="",
+                    *args,
+                    **kwargs,
+                ):
+                    hnom = fakeselector.get_hist(h, *args, **kwargs)
+
+                    ax_names = [n for n in hnom.axes.name]
+                    sel_var = [slice(None)] * hnom.ndim
+                    sel_const = [slice(None)] * hnom.ndim
+                    sel_var[ax_names.index(datagroups.fakeTransferAxis)] = 0
+                    sel_const[ax_names.index(datagroups.fakeTransferAxis)] = 1
+
+                    hvar = syst_tools.add_nonprompt_transfer_factor_variations(
+                        hnom.copy(),
+                        correctionFile,
+                        altHistName,
+                        sel_var,
+                        varIdxs=varIdxs,
+                    )
+
+                    hvar_utPlus = hnom.copy()[tuple(sel_const)]
+
+                    if varIdxs[0] != -1:
+                        hvar.values()[
+                            tuple([*sel_const, slice(None), slice(None)])
+                        ] = hvar_utPlus.values()[..., None, None]
+                    else:
+                        hvar.values()[
+                            tuple([*sel_const, slice(None)])
+                        ] = hvar_utPlus.values()[..., None]
+
+                    if len(axesToDecorrNames) > 0:
+                        hvar = syst_tools.decorrelateByAxes(
+                            hvar,
+                            hnom,
+                            axesToDecorrNames,
+                            newDecorrAxesNames=[
+                                f"{x}_decorr" for x in axesToDecorrNames
+                            ],
+                        )
+
+                    return hvar
+
+                datagroups.addSystematic(
+                    inputBaseName,
+                    groups=[subgroup, "Fake", "experiment", "expNoCalib", "expNoLumi"],
+                    name=f"{datagroups.fakeName}TransferFactorStat",
+                    baseName=f"{datagroups.fakeName}TransferFactorStat",
+                    processes=datagroups.fakeName,
+                    noConstraint=False,
+                    mirror=False,
+                    scale=1,
+                    applySelection=False,  # don't apply selection, external parameters need to be added
+                    action=fake_transferFactor_ptSyst,
+                    actionArgs=dict(
+                        altHistName="fakeCorr_altStat",
+                        varIdxs=[0],
+                        correctionFile=f"{common.data_dir}/fakesWmass/{args.fakeTransferCorrFileName}.pkl.lz4",
+                    ),
+                    systAxes=["varTF", "downUpVar"],
+                    labelsByAxis=["varTF", "downUpVar"],
+                )
+                """
+                datagroups.addSystematic(
+                    inputBaseName,
+                    groups=[subgroup, "Fake", "experiment", "expNoCalib", "expNoLumi"],
+                    name=f"{datagroups.fakeName}TransferFactorClosQCD",
+                    baseName=f"{datagroups.fakeName}TransferFactorClosQCD",
+                    processes=datagroups.fakeName,
+                    noConstraint=False,
+                    mirror=False,
+                    scale=1,
+                    applySelection=False,  # don't apply selection, external parameters need to be added
+                    action=fake_transferFactor_ptSyst,
+                    actionArgs=dict(
+                        altHistName="fakeCorr_closQCDsv",
+                        varIdxs = [],
+                        correctionFile=f"{common.data_dir}/fakesWmass/{args.fakeTransferCorrFileName}.pkl.lz4",
+                    ),
+                    systAxes=["downUpVar"],
+                    labelsByAxis=["downUpVar"],
+                )
+                """
+
+                datagroups.addSystematic(
+                    inputBaseName,
+                    groups=[subgroup, "Fake", "experiment", "expNoCalib", "expNoLumi"],
+                    name=f"{datagroups.fakeName}TransferFactorClosQCDsignal",
+                    baseName=f"{datagroups.fakeName}TransferFactorClosQCDsignal",
+                    processes=datagroups.fakeName,
+                    noConstraint=False,
+                    mirror=False,
+                    scale=1,
+                    applySelection=False,  # don't apply selection, external parameters need to be added
+                    action=fake_transferFactor_ptSyst,
+                    actionArgs=dict(
+                        altHistName="fakeCorr_closQCDsignal",
+                        varIdxs=[],
+                        correctionFile=f"{common.data_dir}/fakesWmass/{args.fakeTransferCorrFileName}.pkl.lz4",
+                    ),
+                    systAxes=["downUpVar"],
+                    labelsByAxis=["downUpVar"],
                 )
 
     if not args.noEfficiencyUnc:
@@ -2839,6 +2957,54 @@ def setup(
         passToFakes=passSystToFakes,
     )
 
+    # ad-hoc uncertainties for recoil, scaling and smearing met
+    datagroups.addSystematic(
+        "scaleMET_pt",
+        mirror=True,
+        processes=datagroups.allMCProcesses(),
+        groups=[
+            "recoil_syst_tmp",
+            "recoil",
+            "experiment",
+            "expNoLumi",
+            "expNoCalib",
+        ],
+        scale=0.1,
+        systAxes=[],
+        passToFakes=passSystToFakes,
+    )
+    datagroups.addSystematic(
+        "smearMET_pt",
+        mirror=True,
+        processes=datagroups.allMCProcesses(),
+        groups=[
+            "recoil_syst_tmp",
+            "recoil",
+            "experiment",
+            "expNoLumi",
+            "expNoCalib",
+        ],
+        scale=0.5,
+        systAxes=[],
+        passToFakes=passSystToFakes,
+    )
+    datagroups.addSystematic(
+        "smearMET_phi",
+        mirror=True,
+        processes=datagroups.allMCProcesses(),
+        groups=[
+            "recoil_syst_tmp",
+            "recoil",
+            "experiment",
+            "expNoLumi",
+            "expNoCalib",
+        ],
+        scale=0.5,
+        systAxes=[],
+        passToFakes=passSystToFakes,
+    )
+    ####
+
     ## decorrelated momentum scale and resolution, when requested
     if not dilepton and "ptscale" in args.decorrSystByVar and decorr_syst_var in fitvar:
         datagroups.addSystematic(
@@ -3057,7 +3223,7 @@ def setup(
                 actionArgs=dict(axesToDecorrNames=["run"], newDecorrAxesNames=["run_"]),
             )
 
-    # Previously we had a QCD uncertainty for the mt dependence on the fakes, see: https://github.com/WMass/WRemnants/blob/f757c2c8137a720403b64d4c83b5463a2b27e80f/scripts/combine/setupRabbitWMass.py#L359
+    # Previously we had a QCD uncertainty for the mt dependence on the fakes, see: https://github.com/WMass/WRemnants/blob/f757c2c8137a720403b64d4c83b5463a2b27e80f/scripts/combine/setupCombineWMass.py#L359
 
     return datagroups
 
