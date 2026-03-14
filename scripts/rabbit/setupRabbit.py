@@ -476,7 +476,7 @@ def make_parser(parser=None):
     parser.add_argument(
         "--fakeTransferCorrFileName",
         type=str,
-        default="fakeTransferTemplates",
+        default="fakeTransferTemplates_smoothTF",
         help="""
         Name of pkl.lz4 file (without extension) with pTmu correction for the shape of data-driven fakes.
         Currently used only when utAngleSign is a fakerate axis (detected automatically), since the shape 
@@ -2969,7 +2969,7 @@ def setup(
             "expNoLumi",
             "expNoCalib",
         ],
-        scale=0.1,
+        scale=0.1,  # 10% -> 1%
         systAxes=[],
         passToFakes=passSystToFakes,
     )
@@ -2984,7 +2984,7 @@ def setup(
             "expNoLumi",
             "expNoCalib",
         ],
-        scale=0.5,
+        scale=0.25,  # 20% -> 5%
         systAxes=[],
         passToFakes=passSystToFakes,
     )
@@ -2999,7 +2999,7 @@ def setup(
             "expNoLumi",
             "expNoCalib",
         ],
-        scale=0.5,
+        scale=0.5,  # 10% -> 5%
         systAxes=[],
         passToFakes=passSystToFakes,
     )
