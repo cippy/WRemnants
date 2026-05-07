@@ -1500,6 +1500,70 @@ public:
   }
 };
 
+///////////
+// Additional utility helper to apply scale factors triggering muon
+// eta-phi-charge-iso. The second instance is a similar version but inclusive in
+// eta These helpers don't currently require systematic uncertainties. The
+// difference with/without these scale factors might be used to define an
+// uncertainty.
+///////////
+template <typename HIST_SF> class muon_efficiency_correction_etaPhiChargeIso {
+public:
+  muon_efficiency_correction_etaPhiChargeIso(HIST_SF &&sf_type)
+      : sf_type_(std::make_shared<const HIST_SF>(std::move(sf_type))) {}
+
+  double scale_factor_byCell(int eta_idx, int phi_idx, int charge_idx,
+                             int passiso_idx) const {
+    const double sf =
+        sf_type_->at(eta_idx, phi_idx, charge_idx, passiso_idx).value();
+    return sf;
+  }
+
+  double scale_factor(float eta, float phi, int charge, bool passiso) const {
+
+    auto const eta_idx = sf_type_->template axis<0>().index(eta);
+    auto const phi_idx = sf_type_->template axis<1>().index(phi);
+    auto const charge_idx = sf_type_->template axis<2>().index(charge);
+    auto const passiso_idx = sf_type_->template axis<3>().index(passiso);
+    return scale_factor_byCell(eta_idx, phi_idx, charge_idx, passiso_idx);
+  }
+
+  double operator()(float eta, float phi, int charge, bool passiso) {
+    return scale_factor(eta, phi, charge, passiso);
+  }
+
+protected:
+  std::shared_ptr<const HIST_SF> sf_type_;
+};
+
+// phi-charge-iso
+template <typename HIST_SF> class muon_efficiency_correction_phiChargeIso {
+public:
+  muon_efficiency_correction_phiChargeIso(HIST_SF &&sf_type)
+      : sf_type_(std::make_shared<const HIST_SF>(std::move(sf_type))) {}
+
+  double scale_factor_byCell(int phi_idx, int charge_idx,
+                             int passiso_idx) const {
+    const double sf = sf_type_->at(phi_idx, charge_idx, passiso_idx).value();
+    return sf;
+  }
+
+  double scale_factor(float phi, int charge, bool passiso) const {
+
+    auto const phi_idx = sf_type_->template axis<0>().index(phi);
+    auto const charge_idx = sf_type_->template axis<1>().index(charge);
+    auto const passiso_idx = sf_type_->template axis<2>().index(passiso);
+    return scale_factor_byCell(phi_idx, charge_idx, passiso_idx);
+  }
+
+  double operator()(float phi, int charge, bool passiso) {
+    return scale_factor(phi, charge, passiso);
+  }
+
+protected:
+  std::shared_ptr<const HIST_SF> sf_type_;
+};
+
 } // namespace wrem
 
 #endif

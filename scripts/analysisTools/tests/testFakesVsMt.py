@@ -296,7 +296,7 @@ def drawAndFitFRF(
         ymax += diff * 0.45
         if ymin < 0:
             ymin = 0
-        if ymax > 4.0:
+        if ymax > 4.0 and not noMtABCD:
             ymax = 4.0
 
     h1.GetXaxis().SetTitle(xAxisName)
@@ -719,8 +719,8 @@ def runStudy(fname, charges, mainOutputFolder, args):
         "oneMinusCosdphi": "mTStudyForFakesAlt",
         "mtOverPt": "mTStudyForFakesAlt2",
         "altMt": "mTStudyForFakesAlt3",
-        "dxybs": "mTStudyForFakesAlt4",  # "mTStudyForFakes_dxybs",
-        "mtBinnedUt": "mTStudyForFakesAlt5",  # "mTStudyForFakes_uTAngleCosine",
+        "dxybs": "mTStudyForFakes_dxybs",
+        "mtBinnedUt": "mTStudyForFakes_uTAngleCosine",
     }
 
     etaLabel = "#eta^{#mu}" if not args.absEta else "|#eta^{#mu}|"
@@ -824,8 +824,12 @@ def runStudy(fname, charges, mainOutputFolder, args):
             if noMtABCD and "passMT" in hnarfTMP.axes.name:
                 # integrate all mT (unless required differently,
                 # but to use dphi should not cut on mT)
-                hnarfTMP = hnarfTMP[{"passMT": s[:: hist.sum]}]
-                # hnarfTMP = hnarfTMP[{"passMT": False}]
+                if args.mtCut == "pass":
+                    hnarfTMP = hnarfTMP[{"passMT": True}]
+                elif args.mtCut == "fail":
+                    hnarfTMP = hnarfTMP[{"passMT": False}]
+                else:
+                    hnarfTMP = hnarfTMP[{"passMT": s[:: hist.sum]}]
             hnarf = hnarfTMP.copy()
             hnarf_forplots = hnarf.copy()
             hnarf_asNominal = hnarf.copy()
@@ -2521,6 +2525,13 @@ if __name__ == "__main__":
         "--jetCut",
         action="store_true",
         help="Use jet cut to derive the FRF (sample will be more QCD enriched but might bias the FRF)",
+    )
+    parser.add_argument(
+        "--mtCut",
+        type=str,
+        default="pass",
+        choices=["pass", "fail", "sum"],
+        help="Choose to select events passing or failing mT (usually 40 GeV), or integrating, when ABCD doesn't use mT",
     )
     parser.add_argument(
         "--rebinx", dest="rebinEta", default=1, type=int, help="To rebin x axis (eta)"

@@ -20,7 +20,9 @@ narf.clingutils.Declare('#include "muon_efficiencies_smooth.hpp"')
 data_dir = common.data_dir
 
 
-def cloneAxis(ax, overflow=False, underflow=False, newName=None):
+def cloneAxis(
+    ax, overflow=False, underflow=False, newName=None, raiseNotImplemented=True
+):
     axName = newName if newName else ax.name
     if isinstance(ax, bh.axis.Regular):
         newax = hist.axis.Regular(
@@ -36,10 +38,15 @@ def cloneAxis(ax, overflow=False, underflow=False, newName=None):
             ax.edges, name=axName, overflow=overflow, underflow=underflow
         )
     else:
-        logger.error(
-            f"In cloneAxis(): only Regular and Variable axes are supported for now"
-        )
-        quit()
+        msg = "In cloneAxis(): only Regular and Variable axes are supported for now"
+        if raiseNotImplemented:
+            raise NotImplementedError(msg)
+        else:
+            logger.warning(msg)
+            logger.warning(
+                f"Returning original axis {ax.name} since raiseNotImplemented=False"
+            )
+            newax = ax
     return newax
 
 
@@ -997,3 +1004,112 @@ def make_muon_efficiency_helpers_smooth_altSyst(
     ####
     # return nomi, effsyst
     return helper_syst
+
+
+#### the following is to apply some data/MC corrections vs eta-phi-charge-iso (or inclusive in eta)
+def make_muon_efficiency_correction_etaPhiChargeIso_helpers(
+    era="2016",
+    eta_inclusive=False,
+    antiiso_as_iso=False,  # to use maps for isolated muons also for antisolated ones
+    correction_name="correction",
+    inputfile_iso=None,
+    inputfile_antiiso=None,
+):
+
+    # TODO: implement missing items when needed
+    eradict = {
+        "2016PreVFP": None,
+        "2016PostVFP": "2016",
+        "2017": None,
+        "2018": None,
+    }
+    eratag = eradict[era]
+    if eratag is None:
+        raise NotImplementedError(
+            f"Efficiency correction vs phi-charge-iso not implemented for era {era}."
+        )
+
+    if eta_inclusive:
+        logger.debug(f"Make efficiency correction helper for phi-charge-iso")
+    else:
+        logger.debug(f"Make efficiency correction helper for eta-phi-charge-iso")
+
+    eta_tag = "" if eta_inclusive else "eta_"
+
+    if inputfile_iso is not None:
+        filename_iso = inputfile_iso
+        if antiiso_as_iso or inputfile_antiiso is None:
+            filename_antiiso = inputfile_iso
+        else:
+            filename_antiiso = inputfile_antiiso
+    else:
+        filename_iso = (
+            data_dir
+            + f"/muonSF/corrections/{eratag}/dataMC_{eta_tag}phi_charge_correction.pkl.lz4"
+        )
+        if antiiso_as_iso:
+            filename_antiiso = filename_iso
+        else:
+            filename_antiiso = filename_iso.replace(
+                ".pkl.lz4", "_trigMuonFailIso.pkl.lz4"
+            )
+
+    # load files and merge histograms
+    with lz4.frame.open(filename_iso) as fileCorr:
+        results = pickle.load(fileCorr)
+        corr_iso = results[correction_name]
+    if antiiso_as_iso:
+        corr_antiiso = corr_iso.copy()
+    else:
+        with lz4.frame.open(filename_antiiso) as fileCorrAntiiso:
+            results = pickle.load(fileCorrAntiiso)
+            corr_antiiso = results[correction_name]
+
+    axis_passIso = hist.axis.Boolean(name="passIso")
+    axes = [*corr_iso.axes, axis_passIso]
+    hnew = hist.Hist(*axes, storage=corr_iso.storage_type())
+    hnew.view(flow=False)[..., axis_passIso.index(True)] = corr_iso.view(flow=False)[
+        ...
+    ]
+    hnew.view(flow=False)[..., axis_passIso.index(False)] = corr_antiiso.view(
+        flow=False
+    )[...]
+
+    if not eta_inclusive:
+        # set overflow and underflow eta bins equal to adjacent bins
+        # eta should be the first axis but let's assume it is not
+        eta_axis_index = next(
+            (i for i, ax in enumerate(hnew.axes) if ax.name == "eta"), None
+        )
+        if eta_axis_index is not None:
+            slices = [slice(None)] * hnew.ndim
+            slices[eta_axis_index] = 0
+            hnew.view(flow=True)[tuple(slices)] = hnew.view(flow=True)[
+                tuple(
+                    slice(None) if i != eta_axis_index else 1 for i in range(hnew.ndim)
+                )
+            ]
+            nBinOverflow = hnew.axes[0].extent - 1
+            nBinUp = hnew.axes[0].extent - 2
+            slices[eta_axis_index] = nBinOverflow
+            hnew.view(flow=True)[tuple(slices)] = hnew.view(flow=True)[
+                tuple(
+                    slice(None) if i != eta_axis_index else nBinUp
+                    for i in range(hnew.ndim)
+                )
+            ]
+
+    hnew_pyroot = narf.hist_to_pyroot_boost(hnew)
+    # case without eta
+    if eta_inclusive:
+        helper = ROOT.wrem.muon_efficiency_correction_phiChargeIso[type(hnew_pyroot)](
+            ROOT.std.move(hnew_pyroot)
+        )
+    else:
+        helper = ROOT.wrem.muon_efficiency_correction_etaPhiChargeIso[
+            type(hnew_pyroot)
+        ](ROOT.std.move(hnew_pyroot))
+
+    logger.debug(f"Return efficiency correction helper")
+
+    return helper

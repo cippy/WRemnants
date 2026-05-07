@@ -5,6 +5,7 @@ from wremnants.utilities import binning, common, parsing, samples
 analysis_label = common.analysis_label(os.path.basename(__file__))
 parser, initargs = parsing.common_parser(analysis_label)
 
+import math
 
 import hist
 import numpy as np
@@ -98,6 +99,13 @@ parser.add_argument(
     "--forceValidCVH",
     action="store_true",
     help="When not applying muon scale corrections (--muonCorrData none / --muonCorrMC none), require at list that the CVH corrected variables are valid",
+)
+parser.add_argument(
+    "--applyCorrectionVsMuonEtaPhi",
+    type=str,
+    default=None,
+    choices=["phi", "eta_phi", "phi_norm", "eta_phi_norm"],
+    help="Apply correction versus muon phi or eta-phi (always charge and isolation dependent)",
 )
 
 args = parser.parse_args()
@@ -220,6 +228,8 @@ else:
     nominal_axes = [axis_eta, axis_pt, binning.axis_charge]
     nominal_cols = ["trigMuons_eta0", "trigMuons_pt0", "trigMuons_charge0"]
 
+axis_phi = hist.axis.Regular(50, -math.pi, math.pi, name="phi", circular=True)
+
 axis_ut_analysis = hist.axis.Regular(
     2, -2, 2, underflow=False, overflow=False, name="utAngleSign"
 )  # used only to separate positive/negative uT for now
@@ -310,8 +320,21 @@ theory_helpers_procs = theory_corrections.make_theory_helpers(
     args.pdfs, args.theoryCorr, corrs=["qcdScale", "alphaS", "pdf"]
 )
 
-# extra axes which can be used to label tensor_axes
-if args.binnedScaleFactors:
+if args.applyCorrectionVsMuonEtaPhi is not None:
+    muon_correction_helper = muon_efficiencies_smooth.make_muon_efficiency_correction_etaPhiChargeIso_helpers(
+        era=era,
+        eta_inclusive="eta" not in args.applyCorrectionVsMuonEtaPhi,
+        correction_name=(
+            "correction_norm"
+            if "norm" in args.applyCorrectionVsMuonEtaPhi
+            else "correction"
+        ),
+        antiiso_as_iso=True,
+    )
+
+if args.noScaleFactors:
+    logger.info("Running with no scale factors")
+elif args.binnedScaleFactors:
     logger.info("Using binned scale factors and uncertainties")
     # add usePseudoSmoothing=True for tests with Asimov
     muon_efficiency_helper, muon_efficiency_helper_syst, muon_efficiency_helper_stat = (
@@ -336,18 +359,19 @@ else:
 logger.info(f"SF file: {args.sfFile}")
 
 muon_efficiency_helper_syst_altBkg = {}
-for es in common.muonEfficiency_altBkgSyst_effSteps:
-    altSFfile = args.sfFile.replace(".root", "_altBkg.root")
-    logger.info(f"Additional SF file for alternate syst with {es}: {altSFfile}")
-    muon_efficiency_helper_syst_altBkg[es] = (
-        muon_efficiencies_smooth.make_muon_efficiency_helpers_smooth_altSyst(
-            filename=altSFfile,
-            era=era,
-            what_analysis=thisAnalysis,
-            max_pt=axis_pt.edges[-1],
-            effStep=es,
+if not args.noScaleFactors:
+    for es in common.muonEfficiency_altBkgSyst_effSteps:
+        altSFfile = args.sfFile.replace(".root", "_altBkg.root")
+        logger.info(f"Additional SF file for alternate syst with {es}: {altSFfile}")
+        muon_efficiency_helper_syst_altBkg[es] = (
+            muon_efficiencies_smooth.make_muon_efficiency_helpers_smooth_altSyst(
+                filename=altSFfile,
+                era=era,
+                what_analysis=thisAnalysis,
+                max_pt=axis_pt.edges[-1],
+                effStep=es,
+            )
         )
-    )
 
 if args.validateVetoSF:
     logger.warning(
@@ -872,6 +896,17 @@ def build_graph(df, dataset):
                 )
                 weight_expr += "*weight_fullMuonSF_withTrackingReco"
 
+            if args.applyCorrectionVsMuonEtaPhi is not None:
+                phi_corr_vars = ["phi", "charge", "passIso"]
+                if "eta" in args.applyCorrectionVsMuonEtaPhi:
+                    phi_corr_vars = ["eta", *phi_corr_vars]
+                df = df.Define(
+                    "weight_muon_phi_corr",
+                    muon_correction_helper,
+                    [f"trigMuons_{x}0" for x in phi_corr_vars],
+                )
+                weight_expr += "*weight_muon_phi_corr"
+
         # prepare inputs for pixel multiplicity helpers
         cvhName = "cvhideal"
 
@@ -1128,13 +1163,14 @@ def build_graph(df, dataset):
             )
         results.append(nominal_bothMuons)
 
+    df = df.Define("met_wlike_TV2_phi", "met_wlike_TV2.Phi()")
+    df = df.Define(
+        "deltaPhiMuonMet",
+        "wrem::deltaPhi(trigMuons_phi0,met_wlike_TV2_phi)",
+    )
     # cutting after storing mt distributions for plotting, since the cut is only on corrected met
     if args.dphiMuonMetCut > 0.0:
-        df = df.Define(
-            "deltaPhiMuonMet",
-            "std::abs(wrem::deltaPhi(trigMuons_phi0,met_wlike_TV2.Phi()))",
-        )
-        df = df.Filter(f"deltaPhiMuonMet > {args.dphiMuonMetCut*np.pi}")
+        df = df.Filter(f"std::abs(deltaPhiMuonMet) > {args.dphiMuonMetCut*np.pi}")
 
     if isZ:
         # for vertex efficiency plot in MC
@@ -1168,6 +1204,34 @@ def build_graph(df, dataset):
             [*cols_vertexZstudy, "nominal_weight"],
         )
         results.append(yieldsVertexZstudy)
+
+    # control histograms to plot them later
+    results.append(
+        df.HistoBoost(
+            "trigMuonPhi_beforeMtCut",
+            [axis_phi, axis_eta, binning.axis_charge],
+            ["trigMuons_phi0", "trigMuons_eta0", "trigMuons_charge0", "nominal_weight"],
+        )
+    )
+    results.append(
+        df.HistoBoost(
+            "WlikeMetPhi_beforeMtCut",
+            [axis_phi, binning.axis_charge],
+            ["met_wlike_TV2_phi", "trigMuons_charge0", "nominal_weight"],
+        )
+    )
+    results.append(
+        df.HistoBoost(
+            "deltaPhiTrigMuonMet_beforeMtCut",
+            [axis_phi, axis_eta, binning.axis_charge],
+            [
+                "deltaPhiMuonMet",
+                "trigMuons_eta0",
+                "trigMuons_charge0",
+                "nominal_weight",
+            ],
+        )
+    )
 
     if not args.addIsoMtAxes:
         df = df.Filter("passWlikeMT")
@@ -1388,38 +1452,39 @@ def build_graph(df, dataset):
 
     if not dataset.is_data and not args.onlyMainHistograms:
 
-        df = systematics.add_muon_efficiency_unc_hists(
-            results,
-            df,
-            muon_efficiency_helper_stat,
-            muon_efficiency_helper_syst,
-            axes,
-            cols,
-            what_analysis=thisAnalysis,
-            singleMuonCollection="trigMuons",
-            smooth3D=args.smooth3dsf,
-        )
-        for es in common.muonEfficiency_altBkgSyst_effSteps:
-            df = systematics.add_muon_efficiency_unc_hists_altBkg(
+        if not args.noScaleFactors:
+            df = systematics.add_muon_efficiency_unc_hists(
                 results,
                 df,
-                muon_efficiency_helper_syst_altBkg[es],
+                muon_efficiency_helper_stat,
+                muon_efficiency_helper_syst,
                 axes,
                 cols,
-                singleMuonCollection="trigMuons",
                 what_analysis=thisAnalysis,
-                step=es,
+                singleMuonCollection="trigMuons",
+                smooth3D=args.smooth3dsf,
             )
-        if args.validateVetoSF:
-            df = systematics.add_muon_efficiency_veto_unc_hists(
-                results,
-                df,
-                muon_efficiency_veto_helper_stat,
-                muon_efficiency_veto_helper_syst,
-                axes,
-                cols,
-                muons="nonTrigMuons",
-            )
+            for es in common.muonEfficiency_altBkgSyst_effSteps:
+                df = systematics.add_muon_efficiency_unc_hists_altBkg(
+                    results,
+                    df,
+                    muon_efficiency_helper_syst_altBkg[es],
+                    axes,
+                    cols,
+                    singleMuonCollection="trigMuons",
+                    what_analysis=thisAnalysis,
+                    step=es,
+                )
+            if args.validateVetoSF:
+                df = systematics.add_muon_efficiency_veto_unc_hists(
+                    results,
+                    df,
+                    muon_efficiency_veto_helper_stat,
+                    muon_efficiency_veto_helper_syst,
+                    axes,
+                    cols,
+                    muons="nonTrigMuons",
+                )
 
         if era == "2016PostVFP" and args.addRunAxis and not args.randomizeDataByRun:
             # to simplify the code, use helper with largest uncertainty for all eras when splitting data
