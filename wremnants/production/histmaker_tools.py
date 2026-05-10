@@ -353,7 +353,6 @@ def make_muon_phi_axis(phi_bins, ax_name="phi", flows=False):
     return phi_axis
 
 
-# TODO: make this function able to create a generic axis with any type
 def make_muon_dxybs_axis(edges, ax_name="dxybs", overflow=True):
     ret_axis = hist.axis.Variable(
         np.array(edges), name=ax_name, underflow=False, overflow=overflow

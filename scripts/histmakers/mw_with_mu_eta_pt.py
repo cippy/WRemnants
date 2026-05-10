@@ -185,10 +185,8 @@ if args.useRefinedVeto and args.useGlobalOrTrackerVeto:
         "Options --useGlobalOrTrackerVeto and --useRefinedVeto cannot be used together at the moment."
     )
 
-if args.useRefinedVeto:
-    pass
-else:
-    pass
+if args.dxybsVeto > 0 and args.dxybsVeto < args.dxybs:
+    raise ValueError("When using together '--dxybsVeto X --dxybs Y' it must be X > Y.")
 
 if args.unfolding or args.theoryAgnostic:
     if args.theoryAgnostic:
@@ -1801,9 +1799,7 @@ def build_graph(df, dataset):
         # Defined as Threshold - |dxybs| so that for signal it peaks at Threshold instead of 0
         # for convenience in the later study
         df = df.Define("goodMuons_dxybs0", f"std::abs(Muon_dxybs[goodMuons][0])")
-        df = df.Define(
-            "goodMuons_dxybsFlip0", f"{args.dxybs} - std::abs(goodMuons_dxybs0)"
-        )
+        df = df.Define("goodMuons_dxybsFlip0", f"{args.dxybs} - goodMuons_dxybs0")
         df = df.Define("goodMuons_trkKink0", f"Muon_trkKink[goodMuons][0]")
 
         mTStudyForFakes = df.HistoBoost(

@@ -139,6 +139,10 @@ if args.useRefinedVeto and args.useGlobalOrTrackerVeto:
     raise NotImplementedError(
         "Options --useGlobalOrTrackerVeto and --useRefinedVeto cannot be used together at the moment."
     )
+
+if args.dxybsVeto > 0 and args.dxybsVeto < args.dxybs:
+    raise ValueError("When using together '--dxybsVeto X --dxybs Y' it must be X > Y.")
+
 if args.validateVetoSF:
     if args.useGlobalOrTrackerVeto or not args.useRefinedVeto:
         raise NotImplementedError(
@@ -648,7 +652,14 @@ def build_graph(df, dataset):
         df, cvh_helper, jpsi_helper, args, dataset, smearing_helper, bias_helper
     )
 
-    df = muon_selections.select_veto_muons(df, nMuons=2, ptCut=args.vetoRecoPt)
+    df = muon_selections.select_veto_muons(
+        df,
+        nMuons=2,
+        ptCut=args.vetoRecoPt,
+        etaCut=args.vetoRecoEta,
+        staPtCut=args.vetoRecoStaPt,
+        dxybsCut=args.dxybsVeto if args.dxybsVeto > 0 else args.dxybs,
+    )
 
     isoThreshold = args.isolationThreshold
 
@@ -669,6 +680,7 @@ def build_graph(df, dataset):
             isoThreshold=isoThreshold,
             requirePixelHits=args.requirePixelHits,
             requireID=False,
+            dxybsCut=args.dxybs,
         )
         df = muon_selections.define_trigger_muons(df)
         # apply lower pt cut and medium ID on triggering muon

@@ -81,6 +81,7 @@ class TheoryHelper(object):
         self.np_model = "Delta_Lambda"
         self.pdf_from_corr = False
         self.scale_pdf_unc = -1.0
+        self.scale_np_lambda4 = 1.0
         self.mirror_tnp = True
         self.minnlo_unc = "byHelicityPt"
         self.helicity_fit_unc = False
@@ -112,6 +113,7 @@ class TheoryHelper(object):
         pdf_operation=None,
         samples=[],
         scale_pdf_unc=-1.0,
+        scale_np_lambda4=1.0,
         minnlo_unc="byHelicityPt",
         minnlo_scale=1.0,
         from_hels=False,
@@ -131,6 +133,7 @@ class TheoryHelper(object):
         self.as_from_corr = pdf_from_corr or as_from_corr
         self.pdf_operation = pdf_operation
         self.scale_pdf_unc = scale_pdf_unc
+        self.scale_np_lambda4 = scale_np_lambda4
         self.samples = samples
         self.helicity_fit_unc = False
         self.minnlo_scale = minnlo_scale
@@ -547,7 +550,7 @@ class TheoryHelper(object):
         self.datagroups.addSystematic(
             histname=self.corr_hist_name,
             processes=processes,
-            groups=["theory"],
+            groups=["fo_stat", "pTModeling", "theory"],
             systAxes=[self.syst_ax],
             passToFakes=self.propagate_to_fakes,
             preOp=lambda h: h[
@@ -823,8 +826,8 @@ class TheoryHelper(object):
         if self.np_model in ["LatticeEigvars", "LatticeNoConstraints"]:
             np_map = {
                 "lambda2": ["0.0", "0.5"],
-                "delta_lambda2": ["0.105", "0.145"],
-                "lambda4": ["0.01", "0.16"],
+                "delta_lambda2": ["-0.02", "0.02"],
+                "lambda4": ["0.01", "0.12"],
             }
         elif "Lambda" in self.np_model:
             np_map = {
@@ -860,6 +863,7 @@ class TheoryHelper(object):
         for nuisance, vals in np_map.items():
             entries = [nuisance + v for v in vals]
             rename = f"scetlibNP{nuisance}"
+            scale = self.scale_np_lambda4 if nuisance.lower() == "lambda4" else 1.0
             # operation = lambda h : h[{self.syst_ax : entries}]
             self.datagroups.addSystematic(
                 self.corr_hist_name,
@@ -870,6 +874,7 @@ class TheoryHelper(object):
                 preOp=operation,
                 preOpArgs=dict(entries=entries),
                 outNames=[f"{rename}Down", f"{rename}Up"],
+                scale=scale,
                 name=rename,
             )
 
@@ -877,8 +882,8 @@ class TheoryHelper(object):
         if self.np_model in ["LatticeEigvars", "LatticeNoConstraints"]:
             np_map = {
                 "lambda2": ["0.0", "0.5"],
-                "delta_lambda2": ["0.105", "0.145"],
-                "lambda4": ["0.01", "0.16"],
+                "delta_lambda2": ["-0.02", "0.02"],
+                "lambda4": ["0.01", "0.12"],
             }
         elif "Lambda" in self.np_model:
             np_map = {
@@ -945,6 +950,7 @@ class TheoryHelper(object):
             for nuisance, vals in np_map.items():
                 entries = [nuisance + v for v in vals]
                 rename = f"scetlibNP{label}{nuisance}"
+                scale = self.scale_np_lambda4 if nuisance.lower() == "lambda4" else 1.0
                 self.datagroups.addSystematic(
                     self.np_hist_name,
                     processes=[sample_group],
@@ -965,6 +971,7 @@ class TheoryHelper(object):
                         (entries[0], f"{rename}Down"),
                     ],
                     skipEntries=[{self.syst_ax: ["central", "pdf0"]}],
+                    scale=scale,
                     name=rename,
                 )
 
